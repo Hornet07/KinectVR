@@ -1,2 +1,2 @@
 # KinectVR
-OpenVR driver for Xbox Kinect
+It doesn't work at all for now 
