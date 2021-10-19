@@ -1,6 +1,2 @@
 # KinectVR
-It doesn't work at all for now
-
-My input profiles don't work
-
-Need to fix that before uploading it
+My code wouldn't work so I just copied the sample driver and added kinect code on top of it :trollface:
