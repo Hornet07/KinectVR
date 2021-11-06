@@ -1,0 +1,15 @@
+{
+   "driver_sample" : {
+      "enable" : true,
+      "serialNumber" : "1234",
+      "modelNumber" : "SampleModel 1",
+      "windowX" : 100,
+      "windowY" : 100,
+      "windowWidth" : 1920,
+      "windowHeight" : 1080,
+      "renderWidth" : 1920,
+      "renderHeight" : 1080,
+      "secondsFromVsyncToPhotons" : 0.011,
+      "displayFrequency" : 144
+   }
+}

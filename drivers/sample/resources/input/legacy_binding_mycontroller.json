@@ -1,0 +1,65 @@
+{
+   "bindings" : {
+    "/actions/legacy": {
+      "poses": [
+        {
+          "output": "/actions/legacy/in/Right_Pose",
+          "path": "/user/hand/right/pose/raw"
+        }
+      ],
+      "sources": [
+        {
+          "inputs": {
+            "single": {
+              "output": "/actions/legacy/in/right_a_press"
+            }
+          },
+          "mode": "button",
+          "parameters": {
+            "sub_mode": "complex"
+          },
+          "path": "/user/hand/right/input/a"
+        },
+        {
+          "inputs": {
+            "single": {
+              "output": "/actions/legacy/in/right_grip_press"
+            }
+          },
+          "mode": "button",
+          "parameters": {
+            "sub_mode": "complex"
+          },
+          "path": "/user/hand/right/input/b"
+        },
+        {
+          "inputs": {
+            "pull": {
+              "output": "/actions/legacy/in/right_axis1_value"
+            },
+            "touch": {
+              "output": "/actions/legacy/in/right_axis1_touch"
+            }
+          },
+          "mode": "trigger",
+          "path": "/user/hand/right/input/trigger"
+        },
+        {
+          "inputs": {
+            "click": {
+              "output": "/actions/legacy/in/right_axis1_press"
+            }
+          },
+          "mode": "button",
+          "parameters": {
+            "haptic_amplitude": "0"
+          },
+          "path": "/user/hand/right/input/trigger"
+        }
+      ]
+    }
+   },
+   "controller_type" : "mycontroller",
+   "description" : "",
+   "name" : "Default binding for Sample Driver Controller for legacy applications"
+}

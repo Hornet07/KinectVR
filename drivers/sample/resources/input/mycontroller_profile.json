@@ -1,0 +1,43 @@
+{
+	"jsonid": "input_profile",
+	"legacy_binding": "{sample}/input/legacy_binding_mycontroller.json",
+	"controller_type": "mycontroller",
+	"input_bindingui_mode": "single_device",
+	"input_bindingui_right": {
+		"image": "{sample}/icons/sample_controller.svg"
+	},
+	"input_source": {
+		"/input/a": {
+			"binding_image_point": [ 80, 60 ],
+			"type": "button",
+			"order": 1
+		},
+		"/input/b": {
+			"binding_image_point": [ 250, 60 ],
+			"type": "button",
+			"order": 2
+		},
+		"/output/haptic": {
+			"binding_image_point": [ 300, 150 ],
+			"type": "vibration",
+			"order": 4
+		},
+		"/pose/raw": {
+			"type": "pose",
+			"binding_image_point": [ 0, 0 ]
+		},
+		"/input/trigger": {
+			"type": "trigger",
+			"click": true,
+			"value": true,
+			"binding_image_point": [ 0, 0 ],
+			"order": 1
+		}
+	},
+	"default_bindings": [
+		{
+			"app_key": "openvr.component.vrcompositor",
+			"binding_url": "vrcompositor_binding_mycontroller.json"
+		}
+	]
+}
