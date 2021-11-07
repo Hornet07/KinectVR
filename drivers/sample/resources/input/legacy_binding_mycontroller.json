@@ -1,5 +1,5 @@
 {
-   "bindings" : {
+  "bindings": {
     "/actions/legacy": {
       "poses": [
         {
@@ -58,8 +58,8 @@
         }
       ]
     }
-   },
-   "controller_type" : "mycontroller",
-   "description" : "",
-   "name" : "Default binding for Sample Driver Controller for legacy applications"
+  },
+  "controller_type": "mycontroller",
+  "description": "",
+  "name": "Default binding for Sample Driver Controller for legacy applications"
 }

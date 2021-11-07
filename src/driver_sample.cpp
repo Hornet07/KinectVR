@@ -12,23 +12,6 @@
 
 using namespace vr;
 
-float root( float number )
-{
-    long i;
-    float x2, y;
-    const float threehalfs = 1.5F;
-
-    x2 = number * 0.5F;
-    y  = number;
-    i  = * ( long * ) &y;                       // evil floating point bit level hacking
-    i  = 0x5f3759df - ( i >> 1 );               // what the fuck?
-    y  = * ( float * ) &i;
-    y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
-//	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
-
-    return y;
-}
-
 #include <glm/gtc/quaternion.hpp>
 #include <Kinect.h>
 IKinectSensor* sensor;      // Kinect sensor
@@ -36,10 +19,9 @@ IBodyFrameReader* reader;       // Body frame reader
 ICoordinateMapper* mapper;      // Converts between depth, color, and 3d coordinates
 
 // Body tracking variables
+bool trackedFirstFrame = true;
 BOOLEAN tracked;                    // Do we see a body
 Joint joints[JointType_Count];      // List of joints in the tracked body
-
-glm::vec3 bodyJoinPos{0,0,0};
 
 // Hand tracking variables
 HandState leftHandState = HandState_Unknown;
@@ -85,10 +67,9 @@ void processBody(int nBodyCount, IBody** ppBodies) {
         for (int i = 0; i < nBodyCount; ++i) {
             IBody *pBody = ppBodies[i];
             if (pBody) {
-                BOOLEAN bTracked = false;
-                hr = pBody->get_IsTracked(&bTracked);
+                hr = pBody->get_IsTracked(&tracked);
 
-                if (SUCCEEDED(hr) && bTracked) {
+                if (SUCCEEDED(hr) && tracked) {
                     //Joint joints[JointType_Count];
 
                     pBody->get_HandLeftState(&leftHandState);
@@ -101,8 +82,8 @@ void processBody(int nBodyCount, IBody** ppBodies) {
                 }
             }
         }
-        bodyJoinPos = glm::vec3(joints[JointType_HandRight].Position.X, joints[JointType_HandRight].Position.Y, joints[JointType_HandRight].Position.Z);
     }
+    trackedFirstFrame = true;
 }
 
 void getBodyData() {
@@ -137,8 +118,11 @@ void getBodyData() {
 
 void terminateKinect(){
     mapper->Release();
+    mapper = NULL;
     reader->Release();
+    reader = NULL;
     sensor->Close();
+    sensor = NULL;
 }
 
 #if defined(_WIN32)
@@ -332,44 +316,6 @@ public:
         // avoid "not fullscreen" warnings from vrmonitor
         vr::VRProperties()->SetBoolProperty( m_ulPropertyContainer, Prop_IsOnDesktop_Bool, false );
 
-        // Icons can be configured in code or automatically configured by an external file "drivername\resources\driver.vrresources".
-        // Icon properties NOT configured in code (post Activate) are then auto-configured by the optional presence of a driver's "drivername\resources\driver.vrresources".
-        // In this manner a driver can configure their icons in a flexible data driven fashion by using an external file.
-        //
-        // The structure of the driver.vrresources file allows a driver to specialize their icons based on their HW.
-        // Keys matching the value in "Prop_ModelNumber_String" are considered first, since the driver may have model specific icons.
-        // An absence of a matching "Prop_ModelNumber_String" then considers the ETrackedDeviceClass ("HMD", "Controller", "GenericTracker", "TrackingReference")
-        // since the driver may have specialized icons based on those device class names.
-        //
-        // An absence of either then falls back to the "system.vrresources" where generic device class icons are then supplied.
-        //
-        // Please refer to "bin\drivers\sample\resources\driver.vrresources" which contains this sample configuration.
-        //
-        // "Alias" is a reserved key and specifies chaining to another json block.
-        //
-        // In this sample configuration file (overly complex FOR EXAMPLE PURPOSES ONLY)....
-        //
-        // "Model-v2.0" chains through the alias to "Model-v1.0" which chains through the alias to "Model-v Defaults".
-        //
-        // Keys NOT found in "Model-v2.0" would then chase through the "Alias" to be resolved in "Model-v1.0" and either resolve their or continue through the alias.
-        // Thus "Prop_NamedIconPathDeviceAlertLow_String" in each model's block represent a specialization specific for that "model".
-        // Keys in "Model-v Defaults" are an example of mapping to the same states, and here all map to "Prop_NamedIconPathDeviceOff_String".
-        //
-        bool bSetupIconUsingExternalResourceFile = true;
-        if ( !bSetupIconUsingExternalResourceFile )
-        {
-            // Setup properties directly in code.
-            // Path values are of the form {drivername}\icons\some_icon_filename.png
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceOff_String, "{sample}/icons/headset_sample_status_off.png" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceSearching_String, "{sample}/icons/headset_sample_status_searching.gif" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceSearchingAlert_String, "{sample}/icons/headset_sample_status_searching_alert.gif" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceReady_String, "{sample}/icons/headset_sample_status_ready.png" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceReadyAlert_String, "{sample}/icons/headset_sample_status_ready_alert.png" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceNotReady_String, "{sample}/icons/headset_sample_status_error.png" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceStandby_String, "{sample}/icons/headset_sample_status_standby.png" );
-            vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, vr::Prop_NamedIconPathDeviceAlertLow_String, "{sample}/icons/headset_sample_status_ready_low.png" );
-        }
-
         initKinect();
 
         return VRInitError_None;
@@ -394,10 +340,6 @@ public:
 
         // override this to add a component to a driver
         return NULL;
-    }
-
-    virtual void PowerOff()
-    {
     }
 
     /** debug request from a client */
@@ -487,8 +429,8 @@ public:
         // driver blocks it for some periodic task.
         if ( m_unObjectId != vr::k_unTrackedDeviceIndexInvalid )
         {
-            vr::VRServerDriverHost()->TrackedDevicePoseUpdated( m_unObjectId, GetPose(), sizeof( DriverPose_t ) );
             getBodyData();
+            vr::VRServerDriverHost()->TrackedDevicePoseUpdated( m_unObjectId, GetPose(), sizeof( DriverPose_t ) );
         }
     }
 
@@ -515,19 +457,30 @@ private:
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-double cyaw = 0, cpitch = 0, croll = 0;
-double ct0, ct1, ct2, ct3, ct4, ct5;
 class CSampleControllerDriver : public vr::ITrackedDeviceServerDriver
 {
 public:
-    CSampleControllerDriver()
+    CSampleControllerDriver(std::string serial)
     {
         m_unObjectId = vr::k_unTrackedDeviceIndexInvalid;
         m_ulPropertyContainer = vr::k_ulInvalidPropertyContainer;
 
-        m_sSerialNumber = "CTRL_1234";
+        m_sSerialNumber = serial;
 
         m_sModelNumber = "MyController";
+
+        if(m_sSerialNumber == "CTRL_RIGHT"){
+            jHand = JointType_HandRight;
+            jTip = JointType_HandTipRight;
+            jWrist = JointType_WristRight;
+            jElbow = JointType_ElbowRight;
+        }
+        else if(m_sSerialNumber == "CTRL_LEFT"){
+            jHand = JointType_HandLeft;
+            jTip = JointType_HandTipLeft;
+            jWrist = JointType_WristLeft;
+            jElbow = JointType_ElbowLeft;
+        }
     }
 
     virtual ~CSampleControllerDriver()
@@ -542,8 +495,6 @@ public:
 
         vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, Prop_ModelNumber_String, m_sModelNumber.c_str() );
         vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, Prop_RenderModelName_String, m_sModelNumber.c_str() );
-
-        // return a constant that's not 0 (invalid) or 1 (reserved for Oculus)
         vr::VRProperties()->SetUint64Property( m_ulPropertyContainer, Prop_CurrentUniverseId_Uint64, 2 );
 
         // avoid "not fullscreen" warnings from vrmonitor
@@ -552,11 +503,11 @@ public:
         // our sample device isn't actually tracked, so set this property to avoid having the icon blink in the status window
         vr::VRProperties()->SetBoolProperty( m_ulPropertyContainer, Prop_NeverTracked_Bool, true );
 
-        // even though we won't ever track we want to pretend to be the right hand so binding will work as expected
-        vr::VRProperties()->SetInt32Property( m_ulPropertyContainer, Prop_ControllerRoleHint_Int32, TrackedControllerRole_RightHand );
+        if(m_sSerialNumber == "CTRL_RIGHT")
+            vr::VRProperties()->SetInt32Property( m_ulPropertyContainer, Prop_ControllerRoleHint_Int32, TrackedControllerRole_RightHand );
+        else if(m_sSerialNumber == "CTRL_LEFT")
+            vr::VRProperties()->SetInt32Property( m_ulPropertyContainer, Prop_ControllerRoleHint_Int32, TrackedControllerRole_LeftHand );
 
-        // this file tells the UI what to show the user for binding this controller as well as what default bindings should
-        // be for legacy or other apps
         vr::VRProperties()->SetStringProperty( m_ulPropertyContainer, Prop_InputProfilePath_String, "{sample}/input/mycontroller_profile.json" );
 
         // create all the input components
@@ -569,9 +520,11 @@ public:
         // create our haptic component
         vr::VRDriverInput()->CreateHapticComponent( m_ulPropertyContainer, "/output/haptic", &m_compHaptic );
 
+        /*
+         * Maybe you don't
+        //TODO: You know what to do
         VRSettings()->SetString(k_pch_Trackers_Section, "/devices/sample/CTRL_1234", "TrackerRole_RightHand");
-
-        //VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/pose/raw", &pose, vr::VRScalarType_Absolute, EVRScalarUnits::VRScalarUnits_NormalizedOneSided);
+        */
 
         return VRInitError_None;
     }
@@ -591,10 +544,6 @@ public:
         return NULL;
     }
 
-    virtual void PowerOff()
-    {
-    }
-
     /** debug request from a client */
     virtual void DebugRequest( const char *pchRequest, char *pchResponseBuffer, uint32_t unResponseBufferSize )
     {
@@ -611,46 +560,16 @@ public:
         pose.qWorldFromDriverRotation = HmdQuaternion_Init( 1, 0, 0, 0 );
         pose.qDriverFromHeadRotation = HmdQuaternion_Init( 1, 0, 0, 0 );
 
-        const glm::vec3 hand = glm::vec3(joints[JointType_HandRight].Position.X, joints[JointType_HandRight].Position.Y, joints[JointType_HandRight].Position.Z);
-        const glm::vec3 wrist = glm::vec3(joints[JointType_ElbowRight].Position.X, joints[JointType_ElbowRight].Position.Y, joints[JointType_ElbowRight].Position.Z);
+        const glm::vec3 hand = glm::vec3(joints[jTip].Position.X, joints[jTip].Position.Y, joints[jTip].Position.Z);
+        const glm::vec3 elbow = glm::vec3(joints[jElbow].Position.X, joints[jElbow].Position.Y, joints[jElbow].Position.Z);
+        const glm::vec3 wrist = glm::vec3(joints[jWrist].Position.X, joints[jWrist].Position.Y, joints[jWrist].Position.Z);
 
         const glm::vec3 direction = glm::normalize(hand - wrist);
-        glm::quat rotation = glm::quatLookAt(direction, glm::vec3(0, 1, 0));
+        const glm::quat rotation = glm::quatLookAt(direction, glm::vec3(0, 1, 0));
 
-        /*
-        if ((GetAsyncKeyState(70) & 0x8000) != 0) {
-            cyaw += 0.1;                                       //F
-        }
-        if ((GetAsyncKeyState(72) & 0x8000) != 0) {
-            cyaw += -0.1;                                       //H
-        }
-        if ((GetAsyncKeyState(84) & 0x8000) != 0) {
-            croll += 0.1;                                       //T
-        }
-        if ((GetAsyncKeyState(71) & 0x8000) != 0) {
-            croll += -0.1;                                       //G
-        }
-        */
-
-        pose.vecPosition[0] = joints[JointType_HandRight].Position.X - bodyJoinPos.x;
-        pose.vecPosition[1] = joints[JointType_HandRight].Position.Y - bodyJoinPos.y;
-        pose.vecPosition[2] = joints[JointType_HandRight].Position.Z - bodyJoinPos.z;
-
-        /*
-        //Convert yaw, pitch, roll to quaternion
-        ct0 = cos(cyaw * 0.5);
-        ct1 = sin(cyaw * 0.5);
-        ct2 = cos(croll * 0.5);
-        ct3 = sin(croll * 0.5);
-        ct4 = cos(cpitch * 0.5);
-        ct5 = sin(cpitch * 0.5);
-
-        //Set controller rotation
-        pose.qRotation.w = ct0 * ct2 * ct4 + ct1 * ct3 * ct5;
-        pose.qRotation.x = ct0 * ct3 * ct4 - ct1 * ct2 * ct5;
-        pose.qRotation.y = ct0 * ct2 * ct5 + ct1 * ct3 * ct4;
-        pose.qRotation.z = ct1 * ct2 * ct4 - ct0 * ct3 * ct5;
-        */
+        pose.vecPosition[0] = joints[jHand].Position.X - joinPos.x;
+        pose.vecPosition[1] = joints[jHand].Position.Y - joinPos.y;
+        pose.vecPosition[2] = joints[jHand].Position.Z - joinPos.z;
 
         pose.qRotation.w = rotation.w;
         pose.qRotation.x = rotation.x;
@@ -661,16 +580,17 @@ public:
     }
 
     void RunFrame() {
-        //vr::VRDriverInput()->UpdateBooleanComponent(m_compA, leftHandState == HandState_Open, 0);
-        //vr::VRDriverInput()->UpdateBooleanComponent(m_compB, rightHandState == HandState_Open, 0);
-        if(leftHandState == HandState_Lasso && rightHandState == HandState_Lasso) {
-            vr::VRDriverInput()->UpdateBooleanComponent(m_compA, true, 0);
+        /*if(tracked && trackedFirstFrame){
+            joinPos = glm::vec3(joints[jHand].Position.X, joints[jHand].Position.Y, joints[jHand].Position.Z);
+            trackedFirstFrame = false;
+        }*/
+
+        if(leftHandState == HandState_Open) {
             VRDriverInput()->UpdateScalarComponent(m_compTriggerValue, 1.0, 0);
             vr::VRDriverInput()->UpdateBooleanComponent(m_compTriggerClick, true, 0);
         }
         else {
             VRDriverInput()->UpdateScalarComponent(m_compTriggerValue, 0.0, 0);
-            vr::VRDriverInput()->UpdateBooleanComponent(m_compA, false, 0);
             vr::VRDriverInput()->UpdateBooleanComponent(m_compTriggerClick, false, 0);
         }
 
@@ -708,6 +628,10 @@ private:
 
     std::string m_sSerialNumber;
     std::string m_sModelNumber;
+
+    JointType jHand, jTip, jWrist, jElbow;
+
+    glm::vec3 joinPos{0,0,1.4};
 };
 
 //-----------------------------------------------------------------------------
@@ -720,13 +644,14 @@ public:
     virtual void Cleanup() ;
     virtual const char * const *GetInterfaceVersions() { return vr::k_InterfaceVersions; }
     virtual void RunFrame() ;
-    virtual bool ShouldBlockStandbyMode()  { return false; }
+    virtual bool ShouldBlockStandbyMode()  { return true; }
     virtual void EnterStandby()  {}
     virtual void LeaveStandby()  {}
 
 private:
     CSampleDeviceDriver *m_pNullHmdLatest = nullptr;
-    CSampleControllerDriver *m_pController = nullptr;
+    CSampleControllerDriver *m_pControllerRight = nullptr;
+    CSampleControllerDriver *m_pControllerLeft = nullptr;
 };
 
 CServerDriver_Sample g_serverDriverNull;
@@ -740,8 +665,11 @@ EVRInitError CServerDriver_Sample::Init( vr::IVRDriverContext *pDriverContext )
     m_pNullHmdLatest = new CSampleDeviceDriver();
     vr::VRServerDriverHost()->TrackedDeviceAdded( m_pNullHmdLatest->GetSerialNumber().c_str(), vr::TrackedDeviceClass_HMD, m_pNullHmdLatest );
 
-    m_pController = new CSampleControllerDriver();
-    vr::VRServerDriverHost()->TrackedDeviceAdded( m_pController->GetSerialNumber().c_str(), vr::TrackedDeviceClass_Controller, m_pController );
+    m_pControllerRight = new CSampleControllerDriver("CTRL_RIGHT");
+    vr::VRServerDriverHost()->TrackedDeviceAdded( m_pControllerRight->GetSerialNumber().c_str(), vr::TrackedDeviceClass_Controller, m_pControllerRight );
+
+    m_pControllerLeft = new CSampleControllerDriver("CTRL_LEFT");
+    vr::VRServerDriverHost()->TrackedDeviceAdded( m_pControllerLeft->GetSerialNumber().c_str(), vr::TrackedDeviceClass_Controller, m_pControllerLeft );
 
     return VRInitError_None;
 }
@@ -751,29 +679,24 @@ void CServerDriver_Sample::Cleanup()
     CleanupDriverLog();
     delete m_pNullHmdLatest;
     m_pNullHmdLatest = NULL;
-    delete m_pController;
-    m_pController = NULL;
+    delete m_pControllerRight;
+    m_pControllerRight = NULL;
+    delete m_pControllerLeft;
+    m_pControllerLeft = NULL;
 }
 
 
 void CServerDriver_Sample::RunFrame()
 {
-    if ( m_pNullHmdLatest )
-    {
-        m_pNullHmdLatest->RunFrame();
-    }
-    if ( m_pController )
-    {
-        m_pController->RunFrame();
-    }
+    if ( m_pNullHmdLatest ) m_pNullHmdLatest->RunFrame();
+    if ( m_pControllerRight ) m_pControllerRight->RunFrame();
+    if ( m_pControllerLeft ) m_pControllerLeft->RunFrame();
 
     vr::VREvent_t vrEvent;
     while ( vr::VRServerDriverHost()->PollNextEvent( &vrEvent, sizeof( vrEvent ) ) )
     {
-        if ( m_pController )
-        {
-            m_pController->ProcessEvent( vrEvent );
-        }
+        if ( m_pControllerRight ) m_pControllerRight->ProcessEvent( vrEvent );
+        if ( m_pControllerLeft ) m_pControllerLeft->ProcessEvent( vrEvent );
     }
 }
 
