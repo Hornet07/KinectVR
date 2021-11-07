@@ -2,7 +2,5 @@
   {
     "language_tag": "en_US",
     "mycontroller" : "Sample Driver Controller",
-
-    "/input/c" : "'C' key"
   }
 ]
